@@ -172,6 +172,9 @@ static ngx_int_t ngx_http_proxy_host_variable(ngx_http_request_t *r,
 static ngx_int_t ngx_http_proxy_port_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t
+ngx_cache_key_variable(ngx_http_request_t* r,
+    ngx_http_variable_value_t* v, uintptr_t data);
+static ngx_int_t
     ngx_http_proxy_add_x_forwarded_for_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t
@@ -875,6 +878,9 @@ static ngx_http_variable_t  ngx_http_proxy_vars[] = {
       NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
 
     { ngx_string("proxy_port"), NULL, ngx_http_proxy_port_variable, 0,
+      NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
+
+    { ngx_string("cache_key"), NULL, ngx_cache_key_variable, 0,
       NGX_HTTP_VAR_CHANGEABLE|NGX_HTTP_VAR_NOCACHEABLE|NGX_HTTP_VAR_NOHASH, 0 },
 
     { ngx_string("proxy_add_x_forwarded_for"), NULL,
@@ -2558,6 +2564,36 @@ ngx_http_proxy_port_variable(ngx_http_request_t *r,
     v->no_cacheable = 0;
     v->not_found = 0;
     v->data = ctx->vars.port.data;
+
+    return NGX_OK;
+}
+
+
+static ngx_int_t
+ngx_cache_key_variable(ngx_http_request_t* r,
+    ngx_http_variable_value_t* v, uintptr_t data)
+{
+    u_char   buffer[NGX_HTTP_CACHE_KEY_LEN];
+    uint32_t crc32;
+
+    if (!r->cache) {
+        v->not_found = 1;
+        return NGX_OK;
+    }
+
+    ngx_http_file_cache_calculate_key(&r->cache->keys, buffer, &crc32);
+
+    v->len = 2 * NGX_HTTP_CACHE_KEY_LEN;
+    v->data = ngx_pnalloc(r->pool, v->len + 1);
+    if (v->data == NULL) {
+        return NGX_ERROR;
+    }
+
+    ngx_hex_dump(v->data, buffer, NGX_HTTP_CACHE_KEY_LEN);
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_found = 0;
 
     return NGX_OK;
 }

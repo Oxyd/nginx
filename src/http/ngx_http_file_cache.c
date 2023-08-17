@@ -224,38 +224,46 @@ ngx_http_file_cache_create(ngx_http_request_t *r)
 }
 
 
-void
-ngx_http_file_cache_create_key(ngx_http_request_t *r)
+size_t
+ngx_http_file_cache_calculate_key(ngx_array_t *keys, u_char dest[],
+    uint32_t *crc32)
 {
     size_t             len;
     ngx_str_t         *key;
     ngx_uint_t         i;
     ngx_md5_t          md5;
-    ngx_http_cache_t  *c;
-
-    c = r->cache;
 
     len = 0;
 
-    ngx_crc32_init(c->crc32);
+    ngx_crc32_init(*crc32);
     ngx_md5_init(&md5);
 
-    key = c->keys.elts;
-    for (i = 0; i < c->keys.nelts; i++) {
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "http cache key: \"%V\"", &key[i]);
-
+    key = keys->elts;
+    for (i = 0; i < keys->nelts; i++) {
         len += key[i].len;
 
-        ngx_crc32_update(&c->crc32, key[i].data, key[i].len);
+        ngx_crc32_update(crc32, key[i].data, key[i].len);
         ngx_md5_update(&md5, key[i].data, key[i].len);
     }
 
+    ngx_crc32_final(*crc32);
+    ngx_md5_final(dest, &md5);
+
+    return len;
+}
+
+
+void
+ngx_http_file_cache_create_key(ngx_http_request_t *r)
+{
+    size_t             len;
+    ngx_http_cache_t  *c;
+
+    c = r->cache;
+    len = ngx_http_file_cache_calculate_key(&c->keys, c->key, &c->crc32);
+
     c->header_start = sizeof(ngx_http_file_cache_header_t)
                       + sizeof(ngx_http_file_cache_key) + len + 1;
-
-    ngx_crc32_final(c->crc32);
-    ngx_md5_final(c->key, &md5);
 
     ngx_memcpy(c->main, c->key, NGX_HTTP_CACHE_KEY_LEN);
 }

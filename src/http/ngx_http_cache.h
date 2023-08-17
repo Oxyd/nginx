@@ -189,6 +189,8 @@ struct ngx_http_file_cache_s {
 
 ngx_int_t ngx_http_file_cache_new(ngx_http_request_t *r);
 ngx_int_t ngx_http_file_cache_create(ngx_http_request_t *r);
+size_t ngx_http_file_cache_calculate_key(ngx_array_t *keys, u_char dest[],
+    uint32_t *crc32);
 void ngx_http_file_cache_create_key(ngx_http_request_t *r);
 ngx_int_t ngx_http_file_cache_open(ngx_http_request_t *r);
 ngx_int_t ngx_http_file_cache_set_header(ngx_http_request_t *r, u_char *buf);
